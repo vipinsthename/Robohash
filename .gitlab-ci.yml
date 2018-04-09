@@ -1,0 +1,85 @@
+
+# Official image for Hashicorp's Terraform. It uses light image which is Alpine
+# based as it is much lighter.
+#
+# Entrypoint is also needed as image by default set `terraform` binary as an
+# entrypoint.
+image:
+  name: hashicorp/terraform:light
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+# Default output file for Terraform plan
+variables:
+  PLAN: plan.tfplan
+  SERVICE_SERVICE_ECR_URL: <CHANGE>
+
+cache:
+  paths:
+    - .terraform
+
+before_script:
+  - cd terraform
+  - terraform --version
+  - terraform init
+
+stages:
+  - validate
+  - build
+  - deploy
+  - docker-build
+  - docker-deploy
+
+validate:
+  stage: validate
+  tags:
+    - terraformer
+  script:
+    - terraform validate
+
+plan:
+  stage: build
+  tags:
+    - terraformer
+  script:
+    - terraform plan -var 'aws_region=eu-west-2' -out=$PLAN
+  artifacts:
+    name: plan
+    paths:
+      - terraform/$PLAN
+
+apply:
+  stage: deploy
+  tags:
+    - terraformer
+  script:
+    - terraform apply -auto-approve -input=false $PLAN
+  dependencies:
+    - plan
+  only:
+    - master
+
+docker-build:
+  stage: docker-build
+  before_script:
+    - docker info
+  script:
+    - docker build -t ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8} .
+    - $(aws ecr get-login --no-include-email --region=eu-west-2)
+    - docker push ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8}
+  tags:
+    - <CHANGE>
+  only:
+    - master
+
+docker-deploy:
+  stage: docker-deploy
+  before_script:
+    - docker info
+  script:
+    - ecs-deploy -r eu-west-2 -c demovipin -n vservice-robo -i ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8}
+  tags:
+    - <CHANGE>
+  only:
+    - master
