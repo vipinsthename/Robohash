@@ -91,7 +91,7 @@ docker-deploy:
   before_script:
     - docker version
   script:
-    - ecs-deploy -r eu-west-2 -c demovipin -n vservice-robo -i ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8}
+    - ecs-deploy -t 300 -r eu-west-2 -c demovipin -n vservice-robo -i ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8}
   tags:
     - <CHANGE>
   only:
