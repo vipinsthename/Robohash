@@ -13,7 +13,7 @@ image:
 # Default output file for Terraform plan
 variables:
   PLAN: plan.tfplan
-  SERVICE_SERVICE_ECR_URL: <CHANGE>
+  SERVICE_ECR_URL: <CHANGE>
 
 cache:
   paths:
