@@ -25,45 +25,46 @@ before_script:
   - terraform init
 
 stages:
-  - validate
-  - build
-  - deploy
+  - tf-validate
+  - tf-plan
+  - tf-apply
   - docker-build
+  - docker-lint
   - docker-deploy
 
-validate:
-  stage: validate
+tf-validate:
+  stage: tf-validate
   tags:
     - terraformer
   script:
     - terraform validate
 
-plan:
-  stage: build
+tf-plan:
+  stage: tf-plan
   tags:
     - terraformer
   script:
     - terraform plan -var 'aws_region=eu-west-2' -out=$PLAN
   artifacts:
-    name: plan
+    name: tf-plan
     paths:
       - terraform/$PLAN
 
-apply:
-  stage: deploy
+tf-apply:
+  stage: tf-apply
   tags:
     - terraformer
   script:
     - terraform apply -auto-approve -input=false $PLAN
   dependencies:
-    - plan
+    - tf-plan
   only:
     - master
 
 docker-build:
   stage: docker-build
   before_script:
-    - docker info
+    - docker version
   script:
     - docker build -t ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8} .
     - $(aws ecr get-login --no-include-email --region=eu-west-2)
@@ -73,10 +74,22 @@ docker-build:
   only:
     - master
 
+docker-lint:
+  stage: docker-lint
+  before_script:
+    - docker version
+  script:
+    - docker run --rm  -v $(pwd):/code -w "/code" clburlison/pylint:py3-alpine pylint /code/robohash
+  allow_failure: true
+  tags:
+    - <CHANGE>
+  only:
+    - master
+
 docker-deploy:
   stage: docker-deploy
   before_script:
-    - docker info
+    - docker version
   script:
     - ecs-deploy -r eu-west-2 -c demovipin -n vservice-robo -i ${SERVICE_ECR_URL}:${CI_COMMIT_SHA:0:8}
   tags:
